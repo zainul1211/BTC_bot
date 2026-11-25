@@ -31,7 +31,7 @@ jobs:
               url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
               requests.post(url, json={"chat_id": CHAT_ID, "text": msg})
           def get_candles():
-              url = "https://data-api.binance.vision/fapi/v1/klines?symbol=BTCUSDT&interval=1h&limit=100"
+              api.binance.us
               data = requests.get(url, timeout=10).json()
               closes = [float(c[4]) for c in data]
               highs = [float(c[2]) for c in data]
