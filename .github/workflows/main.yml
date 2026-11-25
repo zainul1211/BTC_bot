@@ -20,9 +20,9 @@ jobs:
 
       - name: Run BTC Bot
         env:
-          BOT_TOKEN: "APNA_PURANA_TOKEN_YAHAN_DAALO"
-          CHAT_ID: "APNA_PURANA_CHAT_ID_YAHAN_DAALO"
-        run: |
+          BOT_TOKEN: "8871567794:AAF2ii9RQ0_pSy9S6y8qbFCC1u9Au_hjC18"
+          CHAT_ID: "8691824164"
+           run: |
           cat > bot.py << 'PYEOF'
           import requests, time, os
 
