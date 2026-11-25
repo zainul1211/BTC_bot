@@ -84,4 +84,4 @@ jobs:
                   print(f"Error: {e}")
                   time.sleep(10)
           PYEOF
-          python bot.py
+          python -u bot.py
