@@ -1,42 +1,44 @@
 name: BTC Signal Bot
-
 on:
   workflow_dispatch:
-
+  schedule:
+    - cron: '0 */6 * * *'
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-
-      - name: Install requests
-        run: pip install requests
-
+      - run: pip install requests
       - name: Run BTC Bot
         env:
-          BOT_TOKEN: "8871567794:AAF2ii9RQ0_pSy9S6y8qbFCC1u9Au_hjC18"
-          CHAT_ID: "8691824164"
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
         run: |
           cat > bot.py << 'PYEOF'
           import requests, time, os
+          from datetime import datetime, timezone, timedelta
           BOT_TOKEN = os.environ.get("BOT_TOKEN")
           CHAT_ID = os.environ.get("CHAT_ID")
+          IST = timezone(timedelta(hours=5, minutes=30))
+
           def send_msg(msg):
               url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-              requests.post(url, json={"chat_id": CHAT_ID, "text": msg})
+              try:
+                  requests.post(url, json={"chat_id": CHAT_ID, "text": msg}, timeout=10)
+              except Exception as e:
+                  print(f"Telegram Error: {e}")
+
           def get_candles():
-              "https://api.binance.us/api/v3/klines..."
+              url = "https://data-api.binance.vision/fapi/v1/klines?symbol=BTCUSDT&interval=1h&limit=100"
               data = requests.get(url, timeout=10).json()
               closes = [float(c[4]) for c in data]
               highs = [float(c[2]) for c in data]
               lows = [float(c[3]) for c in data]
               return closes, highs, lows
+
           def calc_atr(highs, lows, closes):
               tr_list = []
               for i in range(1, len(closes)):
@@ -46,9 +48,14 @@ jobs:
               for tr in tr_list[10:]:
                   atr = (atr * 9 + tr) / 10
               return atr
-          print("BTC UT BOT Chalu...")
+
+          send_msg("✅ *BTC UT BOT ON - 24 Hours*\nJab UT me signal banega tabhi msg aayega")
+          print("BTC UT BOT Chalu - 24h...", flush=True)
+
           trailing_stop = 0
-          prev_pos = 0
+          last_signal = None
+          first_run = True
+
           while True:
               try:
                   closes, highs, lows = get_candles()
@@ -56,6 +63,11 @@ jobs:
                   prev_close = closes[-2]
                   atr = calc_atr(highs, lows, closes)
                   nLoss = 3 * atr
+
+                  if first_run:
+                      trailing_stop = close - nLoss if close > prev_close else close + nLoss
+                      first_run = False
+
                   if close > trailing_stop and prev_close > trailing_stop:
                       trailing_stop = max(trailing_stop, close - nLoss)
                   elif close < trailing_stop and prev_close < trailing_stop:
@@ -64,24 +76,33 @@ jobs:
                       trailing_stop = close - nLoss
                   else:
                       trailing_stop = close + nLoss
+
                   pos = 0
                   if prev_close < trailing_stop and close > trailing_stop:
                       pos = 1
                   elif prev_close > trailing_stop and close < trailing_stop:
                       pos = -1
-                  if pos == 1 and prev_pos != 1:
-                      send_msg(f"🟢 BTC BUY @ {close:.2f}\nUT Alert Signal")
-                      print(f"BUY {close}")
-                      prev_pos = 1
-                  elif pos == -1 and prev_pos != -1:
-                      send_msg(f"🔴 BTC SELL @ {close:.2f}\nUT Alert Signal")
-                      print(f"SELL {close}")
-                      prev_pos = -1
-                  else:
-                      print(f"WAIT - BTC Price: {close:.2f} | Stop: {trailing_stop:.2f}")
+
+                  t = datetime.now(IST).strftime('%I:%M %p')
+                  print(f"{t} WAIT - BTC: {close:.2f} | Stop: {trailing_stop:.2f} | Pos: {pos}", flush=True)
+
+                  if last_signal is None:
+                      last_signal = pos
+                      time.sleep(60)
+                      continue
+
+                  if pos == 1 and last_signal != 1:
+                      send_msg(f"🟢 *BTC BUY @ {close:.2f}*\nUT Alert Signal\nTime: {t}")
+                      print(f"BUY {close}", flush=True)
+                      last_signal = 1
+                  elif pos == -1 and last_signal != -1:
+                      send_msg(f"🔴 *BTC SELL @ {close:.2f}*\nUT Alert Signal\nTime: {t}")
+                      print(f"SELL {close}", flush=True)
+                      last_signal = -1
+
                   time.sleep(60)
               except Exception as e:
                   print(f"Error: {e}")
                   time.sleep(10)
           PYEOF
-          python -u bot.py
+          python bot.py
